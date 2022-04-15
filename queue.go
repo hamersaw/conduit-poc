@@ -1,4 +1,4 @@
-package queue
+package conduit
 
 import (
 	"context"
@@ -19,11 +19,17 @@ func NewQueue(topic string) Queue {
 }
 
 func (q *Queue) AddTask(ctx context.Context, task *protos.Task) error {
+	// TODO - add to DB
+
+	// TODO - check for pending long polls
+
+	// TODO - add to buffer (if space)
+
 	return nil
 }
 
 func (q *Queue) Start(ctx context.Context) error {
-	// start refresh routine
+	// start buffer refresh routine
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		for {

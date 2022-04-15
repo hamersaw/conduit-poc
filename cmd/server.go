@@ -8,7 +8,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/hamersaw/conduit-poc/queue"
+	conduit "github.com/hamersaw/conduit-poc"
 	protos "github.com/hamersaw/conduit-poc/protos/gen/pb-go"
 
 	"google.golang.org/grpc"
@@ -17,6 +17,7 @@ import (
 )
 
 var (
+	host = flag.String("host", "127.0.0.1", "The server host")
 	port = flag.Int("port", 50051, "The server port")
 )
 
@@ -24,7 +25,7 @@ func main() {
 	ctx := context.Background()
 
 	// start network listener
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", *host, *port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
@@ -57,7 +58,7 @@ func (c *Conduit) AddTask(ctx context.Context, request *protos.AddTaskRequest) (
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("queue for topic '%s' does not exist", task.GetTopic()))
 	}
-	q, _ := o.(*queue.Queue)
+	q, _ := o.(*conduit.Queue)
 
 	// add task to queue
 	if err := q.AddTask(ctx, task); err != nil {
@@ -68,18 +69,18 @@ func (c *Conduit) AddTask(ctx context.Context, request *protos.AddTaskRequest) (
 }
 
 func (c *Conduit) CreateQueue(ctx context.Context, request *protos.CreateQueueRequest) (*protos.CreateQueueResponse, error) {
-	pbQueue := request.GetQueue()
+	queue := request.GetQueue()
 
 	// initialize and store new queue
-	q := queue.NewQueue(pbQueue.GetTopic())
-	if _, loaded := c.queues.LoadOrStore(pbQueue.GetTopic(), &q); !loaded {
-		return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("queue for topic '%s' already exists", pbQueue.GetTopic()))
+	q := conduit.NewQueue(queue.GetTopic())
+	if _, loaded := c.queues.LoadOrStore(queue.GetTopic(), &q); loaded {
+		return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("queue for topic '%s' already exists", queue.GetTopic()))
 	}
 
 	// start queue
-	if err := q.Start(ctx); err != nil {
-		c.queues.Delete(pbQueue.GetTopic())
-		return nil, status.Errorf(codes.Internal, fmt.Sprintf("failed to start queue '%v' with err: %v", pbQueue.GetTopic(), err))
+	if err := q.Start(context.Background()); err != nil {
+		c.queues.Delete(queue.GetTopic())
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("failed to start queue '%v' with err: %v", queue.GetTopic(), err))
 	}
 
 	return &protos.CreateQueueResponse{}, nil

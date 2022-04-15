@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+service QueueService {
+    rpc CreateQueue(CreateQueueRequest) returns (CreateQueueResponse) {}
+    rpc ListQueues(ListQueuesRequest) returns (ListQueuesResponse) {}
+}
+
+message CreateQueueRequest {
+    Queue queue = 1;
+}
+
+message CreateQueueResponse {
+}
+
+message ListQueuesRequest {
+}
+
+message ListQueuesResponse {
+    repeated Queue queues = 1;
+}
+
+message Queue {
+    string topic = 1;
+}
+
+service TaskService {
+    rpc CreateTasks(CreateTasksRequest) returns (CreateTasksResponse) {}
+}
+
+message CreateTasksRequest {
+    repeated Task tasks = 1;
+}
+
+message CreateTasksResponse {
+}
+
+message Task {
+    string id = 1;
+    int64 execution_duration_milliseconds = 2;
+}

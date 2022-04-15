@@ -2,7 +2,7 @@ syntax = "proto3";
 
 service QueueService {
     rpc CreateQueue(CreateQueueRequest) returns (CreateQueueResponse) {}
-    rpc ListQueues(ListQueuesRequest) returns (ListQueuesResponse) {}
+    rpc ListTopics(ListTopicsRequest) returns (ListTopicsResponse) {}
 }
 
 message CreateQueueRequest {
@@ -12,11 +12,11 @@ message CreateQueueRequest {
 message CreateQueueResponse {
 }
 
-message ListQueuesRequest {
+message ListTopicsRequest {
 }
 
-message ListQueuesResponse {
-    repeated Queue queues = 1;
+message ListTopicsResponse {
+    repeated string topics = 1;
 }
 
 message Queue {
@@ -24,17 +24,18 @@ message Queue {
 }
 
 service TaskService {
-    rpc CreateTasks(CreateTasksRequest) returns (CreateTasksResponse) {}
+    rpc AddTask(AddTaskRequest) returns (AddTaskResponse) {}
 }
 
-message CreateTasksRequest {
-    repeated Task tasks = 1;
+message AddTaskRequest {
+    Task task = 1;
 }
 
-message CreateTasksResponse {
+message AddTaskResponse {
 }
 
 message Task {
     string id = 1;
-    int64 execution_duration_milliseconds = 2;
+    string topic = 2;
+    int64 execution_duration_milliseconds = 3;
 }

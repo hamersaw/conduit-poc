@@ -19,7 +19,9 @@ build-worker:
 	go build -o $(binary_dir)/worker ./cmd/worker.go
 
 generate-protos:
+	rm -r ./protos/gen
 	docker run --rm -u $(shell id -u):$(shell id -g) -v $(shell pwd):/defs $(lyft_image) -i ./protos -d protos -l go --go_source_relative --validate_out
+	mv ./gen ./protos
 
 clean:
-	rm -rf $(binary_dir) ./gen
+	rm -rf $(binary_dir) ./protos/gen

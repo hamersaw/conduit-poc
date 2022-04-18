@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -91,10 +92,14 @@ func (i *Ingress) process(ctx context.Context, task *Task) error {
 		task.LeaseExpirationTs = time.Now().Add(time.Second * 40) // TODO - parameterize the lease duration
 	}
 
+	log.Printf("bufferPassThrough:%v remainingBufferSize:%d", bufferPassThrough, q.GetRemainingBufferSize())
+
 	// add task to DB
 	if err := CreateTask(i.db, task); err != nil {
 		return status.Errorf(codes.Internal, fmt.Sprintf("failed to write task '%v' to db with err: %v", *task, err))
 	}
+
+	log.Printf("wrote task to db")
 
 	if bufferPassThrough {
 		// add task to queue

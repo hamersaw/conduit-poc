@@ -20,7 +20,7 @@ type Queue struct {
 
 func NewQueue(bufferSize int, topic string) Queue {
 	return Queue{
-		buffer:        make(chan *Task, 10),
+		buffer:        make(chan *Task, bufferSize),
 		bufferSize:    int32(0),
 		maxBufferSize: bufferSize,
 		topic:         topic,
@@ -62,22 +62,25 @@ func (q *Queue) Start(ctx context.Context, db *sql.DB) error {
 			// TODO update existing buffer lease
 			// TODO - if this fails longer than > lease_expiration_duration then drain buffer
 			// we can store the lease expiration ts in the id lookup set and update here
-			log.Printf("TODO - update existing buffer elase")
+			log.Printf("TODO - update existing buffer lease")
 
 			// get tasks from db to fill out buffer
-			tasks, err := GetBufferTasks(ctx, db, q.topic, q.GetRemainingBufferSize())
-			if err != nil {
-				log.Printf("failed to retrieve buffered tasks", err)
-			}
+			remainingBufferSize := q.GetRemainingBufferSize()
+			if remainingBufferSize > 0 {
+				tasks, err := GetBufferTasks(ctx, db, q.topic, q.GetRemainingBufferSize())
+				if err != nil {
+					log.Printf("failed to retrieve buffered tasks", err)
+				}
 
-			// add tasks to buffer
-			count := 0
-			for _, task := range tasks {
-				q.AddTask(ctx, task)
-			}
+				// add tasks to buffer
+				count := 0
+				for _, task := range tasks {
+					q.AddTask(ctx, task)
+				}
 
-			if count > 0 {
-				log.Printf("added %d tasks to buffer", count)
+				if count > 0 {
+					log.Printf("added %d tasks to buffer", count)
+				}
 			}
 
 			select {

@@ -23,24 +23,28 @@ type Task struct {
 
 func FromProto(task protos.Task) Task {
 	return Task{
-		ID:                task.Id,
-		Topic:             task.Topic,
-		ExecutionDuration: task.ExecutionDuration.AsDuration(),
-		CompletedTs:       task.CompletedTs.AsTime(), 
-		FinalizedTs:       task.FinalizedTs.AsTime(),
-		InitializedTs:     task.InitializedTs.AsTime(),
-		StartedTs:         task.StartedTs.AsTime(),
+		ID:                    task.Id,
+		Topic:                 task.Topic,
+		ExecutionDuration:     task.ExecutionDuration.AsDuration(),
+		CompletedTs:           task.CompletedTs.AsTime(), 
+		FinalizedTs:           task.FinalizedTs.AsTime(),
+		HeartbeatExpirationTs: task.HeartbeatExpirationTs.AsTime(),
+		InitializedTs:         task.InitializedTs.AsTime(),
+		LeaseExpirationTs:     task.LeaseExpirationTs.AsTime(),
+		StartedTs:             task.StartedTs.AsTime(),
 	}
 }
 
 func (t *Task) ToProto() *protos.Task {
 	return &protos.Task{
-		Id:                t.ID,
-		Topic:             t.Topic,
-		ExecutionDuration: durationpb.New(t.ExecutionDuration),
-		CompletedTs:       timestamppb.New(t.CompletedTs), 
-		FinalizedTs:       timestamppb.New(t.FinalizedTs),
-		InitializedTs:     timestamppb.New(t.InitializedTs),
-		StartedTs:         timestamppb.New(t.StartedTs),
+		Id:                    t.ID,
+		Topic:                 t.Topic,
+		ExecutionDuration:     durationpb.New(t.ExecutionDuration),
+		CompletedTs:           timestamppb.New(t.CompletedTs), 
+		FinalizedTs:           timestamppb.New(t.FinalizedTs),
+		HeartbeatExpirationTs: timestamppb.New(t.HeartbeatExpirationTs),
+		InitializedTs:         timestamppb.New(t.InitializedTs),
+		LeaseExpirationTs:     timestamppb.New(t.LeaseExpirationTs),
+		StartedTs:             timestamppb.New(t.StartedTs),
 	}
 }

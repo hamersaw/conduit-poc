@@ -2,7 +2,30 @@
 ## overview
 proof-of-concept for task scheduling with distributed durable queues.
 
-# references
+## usage
+### postgres
+    # start postgres instance
+    docker run --name postgres --publish 5432:5432 --env POSTGRES_PASSWORD=foo -d postgres
+
+    # connect to postgres using container psql
+    docker exec -it postgres psql -h localhost -U postgres
+
+    # create database and table
+    CREATE DATABASE conduit;
+    \connect conduit
+    CREATE TABLE tasks(
+        id                      VARCHAR(20) PRIMARY KEY,
+        topic                   VARCHAR(50) NOT NULL,
+        execution_duration_ms   INTEGER NOT NULL,
+        completed_ts            TIMESTAMP,
+        finalized_ts            TIMESTAMP,
+        heartbeat_expiration_ts TIMESTAMP,
+        initialized_ts          TIMESTAMP,
+        lease_expiration_ts     TIMESTAMP,
+        started_ts              TIMESTAMP
+    );
+
+## references
 https://shekhargulati.com/2022/01/27/correctly-using-postgres-as-queue/
 [Devious SQL](https://blog.crunchydata.com/blog/message-queuing-using-native-postgresql)
 [psql queue throughput](https://www.pgcon.org/2016/schedule/attachments/414_queues-pgcon-2016.pdf)
@@ -25,7 +48,10 @@ service/matching/taskWriter.go
     writeTaskLoop that reads <requests, reponse chan> from chan
     ensures only one entity is writing or updating at a time
 
-# notes
+## notes
+document transactionality to ensure no double-scheduling of tasks
+    even under failure
+
 how do we scale so a queue is on two TaskServices?
     if we lease tasks from the queue (for our buffered queue)
         then a failure means that no other taskservice can pick up those tasks
@@ -33,6 +59,10 @@ how do we scale so a queue is on two TaskServices?
             heartbeat reporting can failover to another task service
             meaning task hearbeat has a taskservice id (for which taskservice leased it)
         is there an extreme corner case where the taskservice is unable to receive heartbeats, but is not down?
+
+        2022-04-15
+        once a taskservice sends a task to a worker - remove it from the local buffer
+            doesn't need to be in local buffer to process heartbeats
     frontend initiates longpoll for work from one taskservice
         if it doesn't receive a task within n -> initiate longpoll from another
         in a busy system it should only contact a single taskservice (without work it may contact all)
@@ -40,3 +70,12 @@ how do we scale so a queue is on two TaskServices?
     report metrics on taskservice queue length so frontend doesn't have to choose randomly
         should improve speed significantly - otherwise if all are empty use a default (so long polls get work quick)
     **frontend, taskservice, and database can scale independently**
+
+    2022-04-15
+    need separate queue manager to dynamically read queue statistics from redis and create / delete queues from different servers
+        if it dies -> we lose the dynamic scalability until it comes back up (no big deal)
+
+        IncreaseQueueReplicas
+        DecreaseQueueReplicas
+
+when reloading the buffer use "lease expiration < NOW && heartbeat_expiration < NOW"

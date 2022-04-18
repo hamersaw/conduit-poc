@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "google/protobuf/timestamp.proto";
+
 service QueueService {
     rpc CreateQueue(CreateQueueRequest) returns (CreateQueueResponse) {}
     rpc ListTopics(ListTopicsRequest) returns (ListTopicsResponse) {}
@@ -37,5 +39,9 @@ message AddTaskResponse {
 message Task {
     string id = 1;
     string topic = 2;
-    int64 execution_duration_milliseconds = 3;
+    int32 execution_duration_ms = 3;
+    google.protobuf.Timestamp initialized_ts = 4;
+    google.protobuf.Timestamp completed_ts = 5;
+    google.protobuf.Timestamp finalized_ts = 6;
+    google.protobuf.Timestamp started_ts = 7;
 }

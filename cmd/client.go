@@ -43,15 +43,19 @@ func main() {
 						Action:   addTask,
 						Flags: []cli.Flag{
 							&cli.StringFlag{
+								Name:     "id",
+								Aliases:  []string{"i"},
+								Required: true,
+							},
+							&cli.StringFlag{
 								Name:     "topic",
 								Aliases:  []string{"t"},
 								Required: true,
 							},
 							&cli.IntFlag{
-								Name:     "duration-ms",
+								Name:     "execution-duration-ms",
 								Aliases:  []string{"d"},
 								Value:    1000,
-								Required: true,
 							},
 						},
 					},
@@ -107,9 +111,9 @@ func addTask(ctx *cli.Context) error {
 
 	request := &protos.AddTaskRequest{
 		Task: &protos.Task{
-			Id:    "foo",
-			Topic: ctx.String("topic"),
-			// TODO hamersaw - add duration
+			Id:                  ctx.String("id"),
+			Topic:               ctx.String("topic"),
+			ExecutionDurationMs: int32(ctx.Int("execution-duration-ms")),
 		},
 	}
 

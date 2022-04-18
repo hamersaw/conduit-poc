@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/golang/protobuf v1.5.2
+	github.com/lib/pq v1.10.5
 	github.com/urfave/cli/v2 v2.4.0
 	google.golang.org/grpc v1.45.0
 )

@@ -2,38 +2,79 @@ package conduit
 
 import (
 	"context"
+	"database/sql"
 	"log"
+	"sync"
+	"sync/atomic"
 	"time"
-
-	protos "github.com/hamersaw/conduit-poc/protos/gen/pb-go"
 )
 
 type Queue struct {
-	topic string
+	buffer                 chan *Task
+	bufferLeaseExpirations sync.Map
+	bufferSize             int32
+	maxBufferSize          int
+	topic                  string
 }
 
-func NewQueue(topic string) Queue {
+func NewQueue(bufferSize int, topic string) Queue {
 	return Queue{
-		topic: topic,
+		buffer:        make(chan *Task, 10),
+		bufferSize:    0,
+		maxBufferSize: bufferSize,
+		topic:         topic,
 	}
 }
 
-func (q *Queue) AddTask(ctx context.Context, task *protos.Task) error {
-	// TODO - add to DB
+func (q *Queue) GetTask(ctx context.Context) (*Task, error) {
+	task := <- q.buffer
+	q.bufferLeaseExpirations.Delete(task.ID)
+	atomic.AddInt32(&q.bufferSize, -1)
 
-	// TODO - check for pending long polls
+	return task, nil
+}
 
-	// TODO - add to buffer (if space)
+// TODO - should we add a lock here? everytime we insert we check if the buffer size < maxBufferSize
+// and then attempt to add a task - because chan's are always bounded, in the case of multiple adds
+// this function call could block causing either a task insert or the buffer refresh to block
+// ... seems kind of messy
+func (q *Queue) AddTask(ctx context.Context, task *Task) error {
+	q.buffer <- task
+	q.bufferLeaseExpirations.Store(task.ID, task.LeaseExpirationTs)
+	atomic.AddInt32(&q.bufferSize, 1)
 
 	return nil
 }
 
-func (q *Queue) Start(ctx context.Context) error {
+func (q *Queue) GetRemainingBufferSize() int {
+	return q.maxBufferSize - int(atomic.LoadInt32(&q.bufferSize))
+}
+
+func (q *Queue) Start(ctx context.Context, db *sql.DB) error {
 	// start buffer refresh routine
 	go func() {
-		ticker := time.NewTicker(5 * time.Second)
+		ticker := time.NewTicker(5 * time.Second) // TODO - parameterize
 		for {
-			log.Printf("TODO - refresh queue %s", q.topic)
+			// TODO update existing buffer lease
+			// TODO - if this fails longer than > lease_expiration_duration then drain buffer
+			// we can store the lease expiration ts in the id lookup set and update here
+			log.Printf("TODO - update existing buffer elase")
+
+			// get tasks from db to fill out buffer
+			tasks, err := GetBufferTasks(ctx, db, q.topic, q.GetRemainingBufferSize())
+			if err != nil {
+				log.Printf("failed to retrieve buffered tasks", err)
+			}
+
+			// add tasks to buffer
+			count := 0
+			for _, task := range tasks {
+				q.AddTask(ctx, task)
+			}
+
+			if count > 0 {
+				log.Printf("added %d tasks to buffer", count)
+			}
 
 			select {
 			case <-ticker.C:

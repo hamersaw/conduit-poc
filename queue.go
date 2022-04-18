@@ -3,6 +3,7 @@ package conduit
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -20,18 +21,21 @@ type Queue struct {
 func NewQueue(bufferSize int, topic string) Queue {
 	return Queue{
 		buffer:        make(chan *Task, 10),
-		bufferSize:    0,
+		bufferSize:    int32(0),
 		maxBufferSize: bufferSize,
 		topic:         topic,
 	}
 }
 
 func (q *Queue) GetTask(ctx context.Context) (*Task, error) {
-	task := <- q.buffer
-	q.bufferLeaseExpirations.Delete(task.ID)
-	atomic.AddInt32(&q.bufferSize, -1)
-
-	return task, nil
+	select {
+	case task := <- q.buffer:
+		q.bufferLeaseExpirations.Delete(task.ID)
+		atomic.AddInt32(&q.bufferSize, -1)
+		return task, nil
+	case <- ctx.Done():
+		return nil, fmt.Errorf("context canceled request")
+	}
 }
 
 // TODO - should we add a lock here? everytime we insert we check if the buffer size < maxBufferSize

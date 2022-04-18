@@ -13,6 +13,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func main() {
@@ -106,16 +107,17 @@ func addTask(ctx *cli.Context) error {
 	client := protos.NewTaskServiceClient(conn)
 
 	// send AddTaskRequest
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Second * 2)
-	defer cancel()
-
+	executionDuration := time.Millisecond * time.Duration(ctx.Int("execution-duration-ms"))
 	request := &protos.AddTaskRequest{
 		Task: &protos.Task{
-			Id:                  ctx.String("id"),
-			Topic:               ctx.String("topic"),
-			ExecutionDurationMs: int32(ctx.Int("execution-duration-ms")),
+			Id:                ctx.String("id"),
+			Topic:             ctx.String("topic"),
+			ExecutionDuration: durationpb.New(executionDuration),
 		},
 	}
+
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Second * 2)
+	defer cancel()
 
 	if _, err := client.AddTask(timeoutCtx, request); err != nil {
 		return cli.Exit(fmt.Sprintf("Failed to add task %v with err: %v", request, err), 1)

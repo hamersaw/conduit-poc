@@ -16,7 +16,7 @@ proof-of-concept for task scheduling with distributed durable queues.
     CREATE TABLE tasks(
         id                      VARCHAR(20) PRIMARY KEY,
         topic                   VARCHAR(50) NOT NULL,
-        execution_duration_ms   INTEGER NOT NULL,
+        execution_duration      INTERVAL NOT NULL,
         completed_ts            TIMESTAMP,
         finalized_ts            TIMESTAMP,
         heartbeat_expiration_ts TIMESTAMP,

@@ -11,8 +11,8 @@ import (
 
 // TODO - should use prepared queries for all of these - https://pkg.go.dev/database/sql#Tx.Prepare
 const (
-	insertStmt = `insert into "tasks"("id", "topic", "execution_duration_ms", "initialized_ts") values($1, $2, $3, $4)`
-	selectBufferStmt = `select id, topic, execution_duration_ms, completed_ts, finalized_ts, heartbeat_expiration_ts, initialized_ts, lease_expiration_ts, started_ts from tasks where topic=$1 and lease_expiration_ts<$2 and heartbeat_expiration_ts<$3 limit $4 for update`
+	insertStmt = `insert into "tasks"("id", "topic", "execution_duration", "initialized_ts") values($1, $2, $3, $4)`
+	selectBufferStmt = `select id, topic, execution_duration, completed_ts, finalized_ts, heartbeat_expiration_ts, initialized_ts, lease_expiration_ts, started_ts from tasks where topic=$1 and lease_expiration_ts<$2 and heartbeat_expiration_ts<$3 limit $4 for update`
 	updateCompletedStmt = `update "tasks" set "lease_expiration_ms"=$1 where "id"=$2`
 	updateHeartbeattmt = `update "tasks" set "heartbeat_expiration_ms"=$1 where "id"=$2`
 	updateLeaseStmt = `update "tasks" set "lease_expiration_ms"=$1 where "id"=$2`
@@ -27,7 +27,7 @@ func OpenDB(host string, port int, username, password, database string) (*sql.DB
 }
 
 func CreateTask(db *sql.DB, task *Task) error {
-	_, err := db.Exec(insertStmt, task.ID, task.Topic, task.ExecutionDurationMs, task.InitializedTs)
+	_, err := db.Exec(insertStmt, task.ID, task.Topic, task.ExecutionDuration, task.InitializedTs)
 	return err
 }
 
@@ -50,7 +50,7 @@ func GetBufferTasks(ctx context.Context, db *sql.DB, topic string, limit int) ([
 	tasks := make([]*Task, 0)
 	for rows.Next() {
 		task := Task{}
-		err := rows.Scan(task.ID, task.Topic, task.ExecutionDurationMs, task.CompletedTs, task.FinalizedTs, task.HeartbeatExpirationTs, task.InitializedTs, task.LeaseExpirationTs, task.StartedTs)
+		err := rows.Scan(task.ID, task.Topic, task.ExecutionDuration, task.CompletedTs, task.FinalizedTs, task.HeartbeatExpirationTs, task.InitializedTs, task.LeaseExpirationTs, task.StartedTs)
 		if err != nil {
 			tx.Rollback()
 			return nil, err

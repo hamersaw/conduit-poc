@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
 service QueueService {
@@ -27,6 +28,7 @@ message Queue {
 
 service TaskService {
     rpc AddTask(AddTaskRequest) returns (AddTaskResponse) {}
+    rpc GetTask(GetTaskRequest) returns (GetTaskResponse) {}
 }
 
 message AddTaskRequest {
@@ -36,10 +38,18 @@ message AddTaskRequest {
 message AddTaskResponse {
 }
 
+message GetTaskRequest {
+    string topic = 1;
+}
+ 
+message GetTaskResponse {
+    Task task = 1;
+}
+
 message Task {
     string id = 1;
     string topic = 2;
-    int32 execution_duration_ms = 3;
+    google.protobuf.Duration execution_duration = 3;
     google.protobuf.Timestamp initialized_ts = 4;
     google.protobuf.Timestamp completed_ts = 5;
     google.protobuf.Timestamp finalized_ts = 6;

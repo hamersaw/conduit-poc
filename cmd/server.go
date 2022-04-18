@@ -111,6 +111,32 @@ func (c *Conduit) CreateQueue(ctx context.Context, request *protos.CreateQueueRe
 	return &protos.CreateQueueResponse{}, nil
 }
 
+func (c *Conduit) GetTask(ctx context.Context, request *protos.GetTaskRequest) (*protos.GetTaskResponse, error) {
+	topic := request.GetTopic()
+
+	// get queue for topic
+	o, ok := c.queues.Load(topic)
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("queue for topic '%s' does not exist", topic))
+	}
+	q, _ := o.(*conduit.Queue)
+
+	// get task
+	task, err := q.GetTask(ctx)
+	if err != nil {
+		// if error is compatible with grpc return directly
+		if _, ok := status.FromError(err); ok {
+			return nil, err
+		}
+
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("failed to get task for topic '%v' with err: %v", topic, err))
+	}
+
+	return &protos.GetTaskResponse{
+		Task: task.ToProto(),
+	}, nil
+}
+
 func (c *Conduit) ListTopics(ctx context.Context, request *protos.ListTopicsRequest) (*protos.ListTopicsResponse, error) {
 	// compile list of topics
 	topics := make([]string, 0)

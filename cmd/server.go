@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"flag"
 	"fmt"
 	"log"
@@ -11,7 +10,9 @@ import (
 	"time"
 
 	conduit "github.com/hamersaw/conduit-poc"
-	protos "github.com/hamersaw/conduit-poc/protos/gen/pb-go"
+	proto "github.com/hamersaw/conduit-poc/protos/gen/pb-go"
+
+	"github.com/uptrace/bun"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -40,7 +41,7 @@ func main() {
 	}
 
 	// connect to database
-	db, err := conduit.OpenDB(*dbHost, *dbPort, *dbUsername, *dbPassword, *dbName)
+	db, err := conduit.OpenDB(ctx, *dbHost, *dbPort, *dbUsername, *dbPassword, *dbName)
 	if err != nil {
 		log.Fatalf("failed to connect to db: %v", err)
 	}
@@ -59,8 +60,8 @@ func main() {
 	}
 
 	server := grpc.NewServer()
-	protos.RegisterTaskServiceServer(server, conduit)
-	protos.RegisterQueueServiceServer(server, conduit)
+	proto.RegisterTaskServiceServer(server, conduit)
+	proto.RegisterQueueServiceServer(server, conduit)
 
 	// start grpc server
 	log.Printf("server listening at %v", listener.Addr())
@@ -72,14 +73,15 @@ func main() {
 }
 
 type Conduit struct {
-	db      *sql.DB
+	db      *bun.DB
 	ingress *conduit.Ingress
 	queues  *sync.Map
 }
 
-func (c *Conduit) AddTask(ctx context.Context, request *protos.AddTaskRequest) (*protos.AddTaskResponse, error) {
+func (c *Conduit) AddTask(ctx context.Context, request *proto.AddTaskRequest) (*proto.AddTaskResponse, error) {
+	now := time.Now()
 	task := conduit.FromProto(*request.GetTask())
-	task.InitializedTs = time.Now()
+	task.InitializedAt = &now
 
 	if err := c.ingress.AddTask(ctx, task); err != nil {
 		// if error is compatible with grpc return directly
@@ -90,10 +92,10 @@ func (c *Conduit) AddTask(ctx context.Context, request *protos.AddTaskRequest) (
 		return nil, status.Errorf(codes.Internal, fmt.Sprintf("failed to add task '%v' with err: %v", *request.GetTask(), err))
 	}
 
-	return &protos.AddTaskResponse{}, nil
+	return &proto.AddTaskResponse{}, nil
 }
 
-func (c *Conduit) CreateQueue(ctx context.Context, request *protos.CreateQueueRequest) (*protos.CreateQueueResponse, error) {
+func (c *Conduit) CreateQueue(ctx context.Context, request *proto.CreateQueueRequest) (*proto.CreateQueueResponse, error) {
 	queue := request.GetQueue()
 
 	// initialize and store new queue
@@ -108,10 +110,10 @@ func (c *Conduit) CreateQueue(ctx context.Context, request *protos.CreateQueueRe
 		return nil, status.Errorf(codes.Internal, fmt.Sprintf("failed to start queue '%v' with err: %v", queue.GetTopic(), err))
 	}
 
-	return &protos.CreateQueueResponse{}, nil
+	return &proto.CreateQueueResponse{}, nil
 }
 
-func (c *Conduit) GetTask(ctx context.Context, request *protos.GetTaskRequest) (*protos.GetTaskResponse, error) {
+func (c *Conduit) GetTask(ctx context.Context, request *proto.GetTaskRequest) (*proto.GetTaskResponse, error) {
 	topic := request.GetTopic()
 
 	// get queue for topic
@@ -132,12 +134,12 @@ func (c *Conduit) GetTask(ctx context.Context, request *protos.GetTaskRequest) (
 		return nil, status.Errorf(codes.Internal, fmt.Sprintf("failed to get task for topic '%v' with err: %v", topic, err))
 	}
 
-	return &protos.GetTaskResponse{
+	return &proto.GetTaskResponse{
 		Task: task.ToProto(),
 	}, nil
 }
 
-func (c *Conduit) ListTopics(ctx context.Context, request *protos.ListTopicsRequest) (*protos.ListTopicsResponse, error) {
+func (c *Conduit) ListTopics(ctx context.Context, request *proto.ListTopicsRequest) (*proto.ListTopicsResponse, error) {
 	// compile list of topics
 	topics := make([]string, 0)
 	c.queues.Range(func(key, value any) bool {
@@ -148,7 +150,7 @@ func (c *Conduit) ListTopics(ctx context.Context, request *protos.ListTopicsRequ
 		return true
 	})
 
-	return &protos.ListTopicsResponse{
+	return &proto.ListTopicsResponse{
 		Topics: topics,
 	}, nil
 }

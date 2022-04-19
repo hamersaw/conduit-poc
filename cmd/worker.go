@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	protos "github.com/hamersaw/conduit-poc/protos/gen/pb-go"
+	proto "github.com/hamersaw/conduit-poc/protos/gen/pb-go"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -30,8 +30,8 @@ func main() {
 	defer conn.Close()
 
 	// create TaskServiceClient
-	client := protos.NewTaskServiceClient(conn)
-	request := &protos.GetTaskRequest{
+	client := proto.NewTaskServiceClient(conn)
+	request := &proto.GetTaskRequest{
 		Topic: *topic,
 	}
 

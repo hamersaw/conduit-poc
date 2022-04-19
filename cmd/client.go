@@ -7,7 +7,7 @@ import (
 	"time"
 	"os"
 
-	protos "github.com/hamersaw/conduit-poc/protos/gen/pb-go"
+	proto "github.com/hamersaw/conduit-poc/protos/gen/pb-go"
 
 	 cli "github.com/urfave/cli/v2"
 
@@ -104,12 +104,12 @@ func addTask(ctx *cli.Context) error {
 	defer conn.Close()
 
 	// create TaskServiceClient
-	client := protos.NewTaskServiceClient(conn)
+	client := proto.NewTaskServiceClient(conn)
 
 	// send AddTaskRequest
 	executionDuration := time.Millisecond * time.Duration(ctx.Int("execution-duration-ms"))
-	request := &protos.AddTaskRequest{
-		Task: &protos.Task{
+	request := &proto.AddTaskRequest{
+		Task: &proto.Task{
 			Id:                ctx.String("id"),
 			Topic:             ctx.String("topic"),
 			ExecutionDuration: durationpb.New(executionDuration),
@@ -135,14 +135,14 @@ func createQueue(ctx *cli.Context) error {
 	defer conn.Close()
 
 	// create QueueServiceClient
-	client := protos.NewQueueServiceClient(conn)
+	client := proto.NewQueueServiceClient(conn)
 
 	// send CreateQueueRequest
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Second * 2)
 	defer cancel()
 
-	request := &protos.CreateQueueRequest{
-		Queue: &protos.Queue{
+	request := &proto.CreateQueueRequest{
+		Queue: &proto.Queue{
 			Topic: ctx.String("topic"),
 		},
 	}
@@ -163,13 +163,13 @@ func listQueues(ctx *cli.Context) error {
 	defer conn.Close()
 
 	// create QueueServiceClient
-	client := protos.NewQueueServiceClient(conn)
+	client := proto.NewQueueServiceClient(conn)
 
 	// send ListQueuesRequest
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Second * 2)
 	defer cancel()
 
-	request := &protos.ListTopicsRequest{}
+	request := &proto.ListTopicsRequest{}
 	response, err := client.ListTopics(timeoutCtx, request)
 	if err != nil {
 		return cli.Exit(fmt.Sprintf("Failed to list queues %v with err: %v", request, err), 1)

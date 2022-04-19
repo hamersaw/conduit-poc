@@ -2,11 +2,12 @@ package conduit
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	//"log"
 	"sync"
 	"time"
+
+	"github.com/uptrace/bun"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,12 +23,12 @@ type ingressResponse struct {
 }
 
 type Ingress struct {
-	db      *sql.DB
+	db      *bun.DB
 	queues  *sync.Map
 	requests chan *ingressRequest
 }
 
-func NewIngress(db *sql.DB, queues *sync.Map, bufferSize int) Ingress {
+func NewIngress(db *bun.DB, queues *sync.Map, bufferSize int) Ingress {
 	return Ingress{
 		db:       db,
 		queues:   queues,
@@ -56,10 +57,10 @@ func (i *Ingress) Start(ctx context.Context) error {
 	return nil
 }
 
-func (i *Ingress) AddTask(ctx context.Context, task Task) error {
+func (i *Ingress) AddTask(ctx context.Context, task *Task) error {
 	responseChan := make(chan *ingressResponse)
 	request := &ingressRequest{
-		task:         &task,
+		task:         task,
 		responseChan: responseChan,
 	}
 
@@ -97,10 +98,11 @@ func (i *Ingress) process(ctx context.Context, task *Task) error {
 		// TODO - document
 		result := make(chan error)
 		go func() {
-			task.LeaseExpirationTs = time.Now().Add(time.Second * 40) // TODO - parameterize the lease duration
+			leaseExpiration := time.Now().Add(time.Second * 40) // TODO - parameterize the lease duration
+			task.LeaseExpirationAt = &leaseExpiration
 
 			// add task to DB
-			err := CreateTask(i.db, task)
+			err := CreateTask(ctx, i.db, task)
 			if err != nil {
 				persistOkChan <- false
 				result <- status.Errorf(codes.Internal, fmt.Sprintf("failed to write task '%v' to db with err: %v", *task, err))
@@ -115,7 +117,7 @@ func (i *Ingress) process(ctx context.Context, task *Task) error {
 		err = <- result
 	default:
 		// add task to DB
-		if e := CreateTask(i.db, task); e != nil {
+		if e := CreateTask(ctx, i.db, task); e != nil {
 			err = status.Errorf(codes.Internal, fmt.Sprintf("failed to write task '%v' to db with err: %v", *task, e))
 		}
 	}

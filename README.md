@@ -17,12 +17,12 @@ proof-of-concept for task scheduling with distributed durable queues.
         id                      VARCHAR(20) PRIMARY KEY,
         topic                   VARCHAR(50) NOT NULL,
         execution_duration      BIGINT NOT NULL,
-        completed_ts            TIMESTAMP,
-        finalized_ts            TIMESTAMP,
-        heartbeat_expiration_ts TIMESTAMP,
-        initialized_ts          TIMESTAMP,
-        lease_expiration_ts     TIMESTAMP,
-        started_ts              TIMESTAMP
+        completed_at            TIMESTAMP,
+        finalized_at            TIMESTAMP,
+        heartbeat_expiration_at TIMESTAMP,
+        initialized_at          TIMESTAMP,
+        lease_expiration_at     TIMESTAMP,
+        started_at              TIMESTAMP
     );
 
 ## references

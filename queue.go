@@ -2,12 +2,13 @@ package conduit
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"sync"
 	//"sync/atomic"
 	"time"
+
+	"github.com/uptrace/bun"
 )
 
 type TaskOffer struct {
@@ -75,7 +76,7 @@ func (q *Queue) GetTask(ctx context.Context) (*Task, error) {
 	return q.maxBufferSize - int(atomic.LoadInt32(&q.bufferSize))
 }*/
 
-func (q *Queue) Start(ctx context.Context, db *sql.DB) error {
+func (q *Queue) Start(ctx context.Context, db *bun.DB) error {
 	// start buffer dispatch routine
 	go func() {
 		for {

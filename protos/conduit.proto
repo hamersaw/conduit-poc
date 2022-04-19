@@ -29,7 +29,7 @@ message Queue {
 service TaskService {
     rpc AddTask(AddTaskRequest) returns (AddTaskResponse) {}
     rpc GetTask(GetTaskRequest) returns (GetTaskResponse) {}
-    rpc HeartbeatTask(HeartbeatTaskRequest) returns (HeartbeatTaskResponse) {}
+    //rpc HeartbeatTask(HeartbeatTaskRequest) returns (HeartbeatTaskResponse) {}
 }
 
 message AddTaskRequest {
@@ -50,17 +50,17 @@ message GetTaskResponse {
 message HeartbeatTaskRequest {
 }
 
-message HearbeatTaskResponse {
+message HeartbeatTaskResponse {
 }
 
 message Task {
     string id = 1;
     string topic = 2;
     google.protobuf.Duration execution_duration = 3;
-    google.protobuf.Timestamp initialized_ts = 4;
-    google.protobuf.Timestamp completed_ts = 5;
-    google.protobuf.Timestamp finalized_ts = 6;
-    google.protobuf.Timestamp heartbeat_expiration_ts = 7;
-    google.protobuf.Timestamp lease_expiration_ts = 8;
-    google.protobuf.Timestamp started_ts = 9;
+    google.protobuf.Timestamp initialized_at = 4;
+    google.protobuf.Timestamp completed_at = 5;
+    google.protobuf.Timestamp finalized_at = 6;
+    google.protobuf.Timestamp heartbeat_expiration_at = 7;
+    google.protobuf.Timestamp lease_expiration_at = 8;
+    google.protobuf.Timestamp started_at = 9;
 }

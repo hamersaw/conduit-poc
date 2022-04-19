@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	//"log"
 	"sync"
 	"time"
 
@@ -83,10 +83,49 @@ func (i *Ingress) process(ctx context.Context, task *Task) error {
 	}
 	q, _ := o.(*Queue)
 
+	persistOkChan := make(chan bool)
+	taskOffer := &TaskOffer{
+		persistOkChan: persistOkChan,
+		task:          task,
+	}
+
+	var err error
+
+	select {
+	case q.head <- taskOffer:
+		// attempt to pass through directly to the queue head
+		// TODO - document
+		result := make(chan error)
+		go func() {
+			task.LeaseExpirationTs = time.Now().Add(time.Second * 40) // TODO - parameterize the lease duration
+
+			// add task to DB
+			err := CreateTask(i.db, task)
+			if err != nil {
+				persistOkChan <- false
+				result <- status.Errorf(codes.Internal, fmt.Sprintf("failed to write task '%v' to db with err: %v", *task, err))
+			}
+
+			// TODO add to ack manager
+
+			persistOkChan <- true
+			result <- nil
+		}()
+
+		err = <- result
+	default:
+		// add task to DB
+		if e := CreateTask(i.db, task); e != nil {
+			err = status.Errorf(codes.Internal, fmt.Sprintf("failed to write task '%v' to db with err: %v", *task, e))
+		}
+	}
+
+	return err
+
 	// might need to rework - two things to note
 	// (1) use this for automatic passthrough to long-polling clients - otherwise we need to wait for the auto buffer refresh
 	// (2) without the use of a lock we may have to wait if the auto refresh races with this - this is highly unlikely
-	bufferPassThrough := false
+	/*bufferPassThrough := false
 	if q.GetRemainingBufferSize() > 0 {
 		bufferPassThrough = true
 		task.LeaseExpirationTs = time.Now().Add(time.Second * 40) // TODO - parameterize the lease duration
@@ -106,7 +145,7 @@ func (i *Ingress) process(ctx context.Context, task *Task) error {
 		if err := q.AddTask(ctx, task); err != nil {
 			return status.Errorf(codes.Internal, fmt.Sprintf("failed to add task '%v' with err: %v", *task, err))
 		}
-	}
+	}*/
 
 	return nil
 }

@@ -132,6 +132,7 @@ func GetBufferTasks(ctx context.Context, db *bun.DB, topic string, limit int) ([
 	err = tx.NewSelect().
 		Model(&tasks).
 		Where("topic = ?", topic).
+		Where("completed_at IS NULL").
 		Where("lease_expiration_at IS NULL").WhereOr("lease_expiration_at < ?", now).
 		Where("heartbeat_expiration_at IS NULL").WhereOr("heartbeat_expiration_at < ?", now).
 		Limit(limit).

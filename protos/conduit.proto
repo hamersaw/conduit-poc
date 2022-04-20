@@ -29,7 +29,7 @@ message Queue {
 service TaskService {
     rpc AddTask(AddTaskRequest) returns (AddTaskResponse) {}
     rpc GetTask(GetTaskRequest) returns (GetTaskResponse) {}
-    //rpc HeartbeatTask(HeartbeatTaskRequest) returns (HeartbeatTaskResponse) {}
+    rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse) {}
 }
 
 message AddTaskRequest {
@@ -47,10 +47,12 @@ message GetTaskResponse {
     Task task = 1;
 }
 
-message HeartbeatTaskRequest {
+message HeartbeatRequest {
+    repeated string completed_ids = 2;
+    repeated string in_progress_ids = 3;
 }
 
-message HeartbeatTaskResponse {
+message HeartbeatResponse {
 }
 
 message Task {

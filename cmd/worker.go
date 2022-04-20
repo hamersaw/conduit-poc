@@ -47,6 +47,7 @@ func (w *Worker) Start(ctx context.Context, waitGroup *sync.WaitGroup) error {
 	if err != nil {
 		log.Fatalf("Failed to connect to gRPC endpoint '%s:%d' with err: %v", *host, *port, err)
 	}
+	//defer conn.Close()
 
 	// create TaskServiceClient
 	client := proto.NewTaskServiceClient(conn)
@@ -54,8 +55,71 @@ func (w *Worker) Start(ctx context.Context, waitGroup *sync.WaitGroup) error {
 		Topic: *topic,
 	}
 
+	completedChan := make(chan string)
+	heartbeatChan := make(chan string)
+
+	// start heartbeat routine
 	go func() {
-		defer conn.Close()
+		ticker := time.NewTicker(time.Second * 10) // TODO parameterize
+		var completedIds, inProgressIds []string
+
+		for {
+			select {
+			case completedId := <- completedChan:
+				// remove id from inProgressIds
+				index := -1
+				for i, id := range inProgressIds {
+					if id == completedId {
+						index = i 
+						break
+					}
+				}
+
+				inProgressIds = append(inProgressIds[:index], inProgressIds[index+1:]...)
+				completedIds = append(completedIds, completedId)
+
+				// send a heartbeat request to signify the completed task
+				request := &proto.HeartbeatRequest{
+					CompletedIds: completedIds,
+				}
+
+				timeoutCtx, cancel := context.WithTimeout(ctx, time.Second * 2) // TODO - parameterize
+				defer cancel()
+
+				_, err := client.Heartbeat(timeoutCtx, request)
+				if err != nil {
+					log.Printf("failed heartbeat with err: %v", err)
+					continue
+				}
+
+				completedIds = completedIds[:0]
+			case heartbeatId := <- heartbeatChan:
+				inProgressIds = append(inProgressIds, heartbeatId)
+			case <- ticker.C:
+				if len(completedIds) != 0 || len(heartbeatIds) != 0 {
+					// send a heartbeat request
+					request := &proto.HeartbeatRequest{
+						CompletedIds:  completedIds,
+						InProgressIds: inProgressIds,
+					}
+
+					timeoutCtx, cancel := context.WithTimeout(ctx, time.Second * 2) // TODO - parameterize
+					defer cancel()
+
+					_, err := client.Heartbeat(timeoutCtx, request)
+					if err != nil {
+						log.Printf("failed heartbeat with err: %v", err)
+						continue
+					}
+
+					completedIds = completedIds[:0]
+				}
+			}
+		}
+	}()
+
+	// start worker routine
+	go func() {
 		for {
 			// send AddTaskRequest
 			timeoutCtx, cancel := context.WithTimeout(ctx, time.Second * 10) // TODO - parameterize long poll duration
@@ -73,8 +137,10 @@ func (w *Worker) Start(ctx context.Context, waitGroup *sync.WaitGroup) error {
 			}
 
 			task := response.GetTask()
+			heartbeatChan <- task.Id
 			//log.Printf("received task '%v'", *task)
 			time.Sleep(task.GetExecutionDuration().AsDuration())
+			completedChan <- task.Id
 			log.Printf("completed task '%v'", *task)
 
 			// TODO - send completion?

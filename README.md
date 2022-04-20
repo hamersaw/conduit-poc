@@ -10,20 +10,13 @@ proof-of-concept for task scheduling with distributed durable queues.
     # connect to postgres using container psql
     docker exec -it postgres psql -h localhost -U postgres
 
-    # create database and table
+    # create database
     CREATE DATABASE conduit;
     \connect conduit
-    CREATE TABLE tasks(
-        id                      VARCHAR(20) PRIMARY KEY,
-        topic                   VARCHAR(50) NOT NULL,
-        execution_duration      BIGINT NOT NULL,
-        completed_at            TIMESTAMP,
-        finalized_at            TIMESTAMP,
-        heartbeat_expiration_at TIMESTAMP,
-        initialized_at          TIMESTAMP,
-        lease_expiration_at     TIMESTAMP,
-        started_at              TIMESTAMP
-    );
+
+## todo
+- LeaseManager
+- set timestamps (StartedAt, CompletedAt, etc)
 
 ## references
 https://shekhargulati.com/2022/01/27/correctly-using-postgres-as-queue/

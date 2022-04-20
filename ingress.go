@@ -108,7 +108,7 @@ func (i *Ingress) process(ctx context.Context, task *Task) error {
 				result <- status.Errorf(codes.Internal, fmt.Sprintf("failed to write task '%v' to db with err: %v", *task, err))
 			}
 
-			// TODO add to ack manager
+			// TODO add to lease manager
 
 			persistOkChan <- true
 			result <- nil
@@ -123,31 +123,4 @@ func (i *Ingress) process(ctx context.Context, task *Task) error {
 	}
 
 	return err
-
-	// might need to rework - two things to note
-	// (1) use this for automatic passthrough to long-polling clients - otherwise we need to wait for the auto buffer refresh
-	// (2) without the use of a lock we may have to wait if the auto refresh races with this - this is highly unlikely
-	/*bufferPassThrough := false
-	if q.GetRemainingBufferSize() > 0 {
-		bufferPassThrough = true
-		task.LeaseExpirationTs = time.Now().Add(time.Second * 40) // TODO - parameterize the lease duration
-	}
-
-	log.Printf("bufferPassThrough:%v remainingBufferSize:%d", bufferPassThrough, q.GetRemainingBufferSize())
-
-	// add task to DB
-	if err := CreateTask(i.db, task); err != nil {
-		return status.Errorf(codes.Internal, fmt.Sprintf("failed to write task '%v' to db with err: %v", *task, err))
-	}
-
-	log.Printf("wrote task to db")
-
-	if bufferPassThrough {
-		// add task to queue
-		if err := q.AddTask(ctx, task); err != nil {
-			return status.Errorf(codes.Internal, fmt.Sprintf("failed to add task '%v' with err: %v", *task, err))
-		}
-	}*/
-
-	return nil
 }

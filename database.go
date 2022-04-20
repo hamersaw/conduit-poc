@@ -9,7 +9,7 @@ import (
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
-	//"github.com/uptrace/bun/extra/bundebug"
+	"github.com/uptrace/bun/extra/bundebug"
 
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -106,15 +106,45 @@ func OpenDB(ctx context.Context, host string, port int, username, password, data
 	sqlDB := sql.OpenDB(pgConnection)
 	db := bun.NewDB(sqlDB, pgdialect.New())
 	//db.AddQueryHook(bundebug.NewQueryHook()) // print failed queries
-	//db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithVerbose(true))) // print all queries
+	db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithVerbose(true))) // print all queries
 
 	// TODO - capture table already exists
 	db.NewCreateTable().Model((*Task)(nil)).Exec(ctx)
 	return db, nil
 }
 
+func CompleteTasks(ctx context.Context, db *bun.DB, ids []string) error {
+	completedAt := time.Now()
+	task := Task{
+		CompletedAt: &completedAt,
+	}
+
+	_, err := db.NewUpdate().
+		Model(&task).
+		Column("completed_at").
+		Where("id IN (?)", bun.In(ids)).
+		Exec(ctx)
+
+	return err
+}
+
 func CreateTask(ctx context.Context, db *bun.DB, task *Task) error {
 	_, err := db.NewInsert().Model(task).Exec(ctx)
+	return err
+}
+
+func HeartbeatTasks(ctx context.Context, db *bun.DB, ids []string) error {
+	heartbeatExpirationAt := time.Now().Add(time.Second * 40) // TODO parameterize
+	task := Task{
+		HeartbeatExpirationAt: &heartbeatExpirationAt,
+	}
+
+	_, err := db.NewUpdate().
+		Model(&task).
+		Column("heartbeat_expiration_at").
+		Where("id IN (?)", bun.In(ids)).
+		Exec(ctx)
+
 	return err
 }
 
@@ -133,8 +163,12 @@ func GetBufferTasks(ctx context.Context, db *bun.DB, topic string, limit int) ([
 		Model(&tasks).
 		Where("topic = ?", topic).
 		Where("completed_at IS NULL").
-		Where("lease_expiration_at IS NULL").WhereOr("lease_expiration_at < ?", now).
-		Where("heartbeat_expiration_at IS NULL").WhereOr("heartbeat_expiration_at < ?", now).
+		WhereGroup("AND", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.WhereOr("lease_expiration_at IS NULL").WhereOr("lease_expiration_at < ?", now)
+		}).
+		WhereGroup("AND", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.WhereOr("heartbeat_expiration_at IS NULL").WhereOr("heartbeat_expiration_at < ?", now)
+		}).
 		Limit(limit).
 		For("UPDATE").
 		Scan(ctx)

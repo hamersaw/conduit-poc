@@ -139,6 +139,23 @@ func (c *Conduit) GetTask(ctx context.Context, request *proto.GetTaskRequest) (*
 	}, nil
 }
 
+func (c *Conduit) Heartbeat(ctx context.Context, request *proto.HeartbeatRequest) (*proto.HeartbeatResponse, error) {
+	log.Printf("HEARTBEAT: %v", request)
+	if len(request.CompletedIds) > 0 {
+		if err := conduit.CompleteTasks(ctx, c.db, request.CompletedIds); err != nil {
+			return nil, status.Errorf(codes.Internal, fmt.Sprintf("failed to complete tasks '%v' with err: %v", request.CompletedIds, err))
+		}
+	}
+
+	if len(request.InProgressIds) > 0 {
+		if err := conduit.HeartbeatTasks(ctx, c.db, request.InProgressIds); err != nil {
+			return nil, status.Errorf(codes.Internal, fmt.Sprintf("failed to heartbeat tasks '%v' with err: %v", request.InProgressIds, err))
+		}
+	}
+
+	return &proto.HeartbeatResponse{}, nil
+}
+
 func (c *Conduit) ListTopics(ctx context.Context, request *proto.ListTopicsRequest) (*proto.ListTopicsResponse, error) {
 	// compile list of topics
 	topics := make([]string, 0)

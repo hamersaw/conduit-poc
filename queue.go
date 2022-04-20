@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	//"sync/atomic"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -49,33 +48,6 @@ func (q *Queue) GetTask(ctx context.Context) (*Task, error) {
 	}
 }
 
-/*func (q *Queue) GetTask(ctx context.Context) (*Task, error) {
-	select {
-	case task := <- q.buffer:
-		q.bufferLeaseExpirations.Delete(task.ID)
-		atomic.AddInt32(&q.bufferSize, -1)
-		return task, nil
-	case <- ctx.Done():
-		return nil, fmt.Errorf("context canceled request")
-	}
-}*/
-
-// TODO - should we add a lock here? everytime we insert we check if the buffer size < maxBufferSize
-// and then attempt to add a task - because chan's are always bounded, in the case of multiple adds
-// this function call could block causing either a task insert or the buffer refresh to block
-// ... seems kind of messy
-/*func (q *Queue) AddTask(ctx context.Context, task *Task) error {
-	atomic.AddInt32(&q.bufferSize, 1)
-	q.bufferLeaseExpirations.Store(task.ID, task.LeaseExpirationTs)
-	q.buffer <- task
-
-	return nil
-}*/
-
-/*func (q *Queue) GetRemainingBufferSize() int {
-	return q.maxBufferSize - int(atomic.LoadInt32(&q.bufferSize))
-}*/
-
 func (q *Queue) Start(ctx context.Context, db *bun.DB) error {
 	// start buffer dispatch routine
 	go func() {
@@ -111,16 +83,11 @@ func (q *Queue) Start(ctx context.Context, db *bun.DB) error {
 				}
 
 				// add tasks to buffer
-				count := 0
 				for _, task := range tasks {
 					q.buffer <- task
-					// TODO - add to lease extension routine
-					//q.AddTask(ctx, task)
 				}
 
-				if count > 0 {
-					log.Printf("added %d tasks to buffer", count)
-				}
+				log.Printf("added %d tasks to buffer", len(tasks))
 			}
 
 			select {

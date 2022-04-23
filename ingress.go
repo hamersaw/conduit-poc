@@ -108,7 +108,8 @@ func (i *Ingress) process(ctx context.Context, task *Task) error {
 				result <- status.Errorf(codes.Internal, fmt.Sprintf("failed to write task '%v' to db with err: %v", *task, err))
 			}
 
-			// TODO add to lease manager
+			// add leased task id
+			q.leasedTaskIds.Add(task.ID)
 
 			persistOkChan <- true
 			result <- nil

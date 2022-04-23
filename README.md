@@ -15,8 +15,11 @@ proof-of-concept for task scheduling with distributed durable queues.
     \connect conduit
 
 ## todo
-- LeaseManager
-- set timestamps (StartedAt, CompletedAt, etc)
+- set StartedAt timestamp
+- hook into prometheus metrics
+    - queue count / size / throughput
+    - postgres read & write ops/s / db size
+- should we update lease and heartbeat by (existing + x) or just (now + x)
 
 ## references
 https://shekhargulati.com/2022/01/27/correctly-using-postgres-as-queue/
@@ -40,35 +43,3 @@ service/matching/taskReader.go:50
 service/matching/taskWriter.go
     writeTaskLoop that reads <requests, reponse chan> from chan
     ensures only one entity is writing or updating at a time
-
-## notes
-document transactionality to ensure no double-scheduling of tasks
-    even under failure
-
-how do we scale so a queue is on two TaskServices?
-    if we lease tasks from the queue (for our buffered queue)
-        then a failure means that no other taskservice can pick up those tasks
-        on restart (failure) the taskservice will receive a heartbeat meaning it was responsible for those tasks
-            heartbeat reporting can failover to another task service
-            meaning task hearbeat has a taskservice id (for which taskservice leased it)
-        is there an extreme corner case where the taskservice is unable to receive heartbeats, but is not down?
-
-        2022-04-15
-        once a taskservice sends a task to a worker - remove it from the local buffer
-            doesn't need to be in local buffer to process heartbeats
-    frontend initiates longpoll for work from one taskservice
-        if it doesn't receive a task within n -> initiate longpoll from another
-        in a busy system it should only contact a single taskservice (without work it may contact all)
-        still get fast passthrough if taskservice createstask during longpoll
-    report metrics on taskservice queue length so frontend doesn't have to choose randomly
-        should improve speed significantly - otherwise if all are empty use a default (so long polls get work quick)
-    **frontend, taskservice, and database can scale independently**
-
-    2022-04-15
-    need separate queue manager to dynamically read queue statistics from redis and create / delete queues from different servers
-        if it dies -> we lose the dynamic scalability until it comes back up (no big deal)
-
-        IncreaseQueueReplicas
-        DecreaseQueueReplicas
-
-when reloading the buffer use "lease expiration < NOW && heartbeat_expiration < NOW"

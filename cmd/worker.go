@@ -56,7 +56,7 @@ func (w *Worker) Start(ctx context.Context, waitGroup *sync.WaitGroup) error {
 	}
 
 	completedChan := make(chan string)
-	heartbeatChan := make(chan string)
+	inProgressChan := make(chan string)
 
 	// start heartbeat routine
 	go func() {
@@ -93,10 +93,10 @@ func (w *Worker) Start(ctx context.Context, waitGroup *sync.WaitGroup) error {
 				}
 
 				completedIds = completedIds[:0]
-			case heartbeatId := <- heartbeatChan:
-				inProgressIds = append(inProgressIds, heartbeatId)
+			case inProgressId := <- inProgressChan:
+				inProgressIds = append(inProgressIds, inProgressId)
 			case <- ticker.C:
-				if len(completedIds) != 0 || len(heartbeatIds) != 0 {
+				if len(completedIds) != 0 || len(inProgressIds) != 0 {
 					// send a heartbeat request
 					request := &proto.HeartbeatRequest{
 						CompletedIds:  completedIds,
@@ -137,7 +137,7 @@ func (w *Worker) Start(ctx context.Context, waitGroup *sync.WaitGroup) error {
 			}
 
 			task := response.GetTask()
-			heartbeatChan <- task.Id
+			inProgressChan <- task.Id
 			//log.Printf("received task '%v'", *task)
 			time.Sleep(task.GetExecutionDuration().AsDuration())
 			completedChan <- task.Id

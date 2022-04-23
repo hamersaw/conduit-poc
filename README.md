@@ -19,7 +19,9 @@ proof-of-concept for task scheduling with distributed durable queues.
 - hook into prometheus metrics
     - queue count / size / throughput
     - postgres read & write ops/s / db size
-- should we update lease and heartbeat by (existing + x) or just (now + x)
+### questions
+- update lease and heartbeat by (existing + x) or just (now + x)?
+- worker define long poll duration or server?
 
 ## references
 https://shekhargulati.com/2022/01/27/correctly-using-postgres-as-queue/

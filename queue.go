@@ -15,20 +15,28 @@ type TaskOffer struct {
 }
 
 type Queue struct {
-	buffer        chan *Task
-	bufferSize    int
-	head          chan *TaskOffer
-	leasedTaskIds *Set
-	topic         string
+	buffer               chan *Task
+	bufferSize           int
+	db                   *bun.DB
+	head                 chan *TaskOffer
+	leasedTaskIds        *Set
+	leaseDuration        time.Duration
+	leaseUpdateInterval  time.Duration
+	topic                string
+	queueRefreshInterval time.Duration
 }
 
-func NewQueue(bufferSize int, topic string) Queue {
+func NewQueue(bufferSize int, db *bun.DB, leaseDuration, leaseUpdateInterval time.Duration, topic string, queueRefreshInterval time.Duration) Queue {
 	return Queue{
-		buffer:        make(chan *Task, bufferSize-1),
-		bufferSize:    bufferSize,
-		head:          make(chan *TaskOffer),
-		leasedTaskIds: new(Set),
-		topic:         topic,
+		db:                   db,
+		buffer:               make(chan *Task, bufferSize-1),
+		bufferSize:           bufferSize,
+		head:                 make(chan *TaskOffer),
+		leasedTaskIds:        new(Set),
+		leaseDuration:        leaseDuration,
+		leaseUpdateInterval:  leaseUpdateInterval,
+		topic:                topic,
+		queueRefreshInterval: queueRefreshInterval,
 	}
 }
 
@@ -42,6 +50,8 @@ func (q *Queue) GetTask(ctx context.Context) (*Task, error) {
 				continue
 			}
 
+			// TODO - set started_at and heartbeat_expiration_at
+
 			// remove leased task id
 			q.leasedTaskIds.Delete(taskOffer.task.ID)
 			return taskOffer.task, nil
@@ -51,7 +61,7 @@ func (q *Queue) GetTask(ctx context.Context) (*Task, error) {
 	}
 }
 
-func (q *Queue) Start(ctx context.Context, db *bun.DB) error {
+func (q *Queue) Start(ctx context.Context) error {
 	// start buffer dispatch routine
 	go func() {
 		for {
@@ -69,7 +79,7 @@ func (q *Queue) Start(ctx context.Context, db *bun.DB) error {
 
 	// start lease update routine
 	go func() {
-		ticker := time.NewTicker(20 * time.Second) // TODO - parameterize
+		ticker := time.NewTicker(q.leaseUpdateInterval)
 		for {
 			// TODO - if this fails longer than > lease_expiration_duration then drain buffer
 
@@ -84,7 +94,7 @@ func (q *Queue) Start(ctx context.Context, db *bun.DB) error {
 
 			// update lease expirations
 			if len(ids) > 0 {
-				if err := LeaseTasks(ctx, db, ids); err != nil {
+				if err := LeaseTasks(ctx, q.db, ids, q.leaseDuration); err != nil {
 					log.Printf("failed to update lease expirations with err: %v", err)
 				}
 			}
@@ -99,12 +109,12 @@ func (q *Queue) Start(ctx context.Context, db *bun.DB) error {
 
 	// start buffer refresh routine
 	go func() {
-		ticker := time.NewTicker(5 * time.Second) // TODO - parameterize
+		ticker := time.NewTicker(q.queueRefreshInterval)
 		for {
 			// get tasks from db to fill out buffer
 			remainingBufferSize := q.bufferSize - len(q.buffer)
 			if remainingBufferSize > 0 {
-				tasks, err := GetBufferTasks(ctx, db, q.topic, remainingBufferSize)
+				tasks, err := GetBufferTasks(ctx, q.db, q.topic, q.leaseDuration, remainingBufferSize)
 				if err != nil {
 					log.Printf("failed to retrieve buffered tasks with err: %v", err)
 				}

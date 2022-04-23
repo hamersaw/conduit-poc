@@ -133,7 +133,7 @@ func CreateTask(ctx context.Context, db *bun.DB, task *Task) error {
 	return err
 }
 
-func GetBufferTasks(ctx context.Context, db *bun.DB, topic string, limit int) ([]*Task, error) {
+func GetBufferTasks(ctx context.Context, db *bun.DB, topic string, leaseDuration time.Duration, limit int) ([]*Task, error) {
 	now := time.Now()
 
 	// begin a new transaction
@@ -164,7 +164,7 @@ func GetBufferTasks(ctx context.Context, db *bun.DB, topic string, limit int) ([
 	}
 
 	// update lease on results 
-	leaseExpirationAt := now.Add(time.Second * 40) // TODO - parameterize
+	leaseExpirationAt := now.Add(leaseDuration)
 	for _, task := range tasks {
 		task.LeaseExpirationAt = &leaseExpirationAt
 	}
@@ -190,8 +190,8 @@ func GetBufferTasks(ctx context.Context, db *bun.DB, topic string, limit int) ([
 	return tasks, nil
 }
 
-func HeartbeatTasks(ctx context.Context, db *bun.DB, ids []string) error {
-	heartbeatExpirationAt := time.Now().Add(time.Second * 40) // TODO parameterize
+func HeartbeatTasks(ctx context.Context, db *bun.DB, ids []string, heartbeatDuration time.Duration) error {
+	heartbeatExpirationAt := time.Now().Add(heartbeatDuration)
 	task := Task{
 		HeartbeatExpirationAt: &heartbeatExpirationAt,
 	}
@@ -205,8 +205,8 @@ func HeartbeatTasks(ctx context.Context, db *bun.DB, ids []string) error {
 	return err
 }
 
-func LeaseTasks(ctx context.Context, db *bun.DB, ids []string) error {
-	leaseExpirationAt := time.Now().Add(time.Second * 40) // TODO parameterize
+func LeaseTasks(ctx context.Context, db *bun.DB, ids []string, leaseDuration time.Duration) error {
+	leaseExpirationAt := time.Now().Add(leaseDuration)
 	task := Task{
 		LeaseExpirationAt: &leaseExpirationAt,
 	}

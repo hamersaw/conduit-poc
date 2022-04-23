@@ -14,8 +14,8 @@ import (
 )
 
 type ingressRequest struct {
-	task *Task
-	responseChan chan <-*ingressResponse
+	task          *Task
+	responseChan  chan <-*ingressResponse
 }
 
 type ingressResponse struct {
@@ -23,16 +23,18 @@ type ingressResponse struct {
 }
 
 type Ingress struct {
-	db      *bun.DB
-	queues  *sync.Map
-	requests chan *ingressRequest
+	db            *bun.DB
+	leaseDuration time.Duration
+	queues        *sync.Map
+	requests      chan *ingressRequest
 }
 
-func NewIngress(db *bun.DB, queues *sync.Map, bufferSize int) Ingress {
+func NewIngress(db *bun.DB, leaseDuration time.Duration, queues *sync.Map, bufferSize int) Ingress {
 	return Ingress{
-		db:       db,
-		queues:   queues,
-		requests: make(chan *ingressRequest, bufferSize),
+		db:            db,
+		leaseDuration: leaseDuration,
+		queues:        queues,
+		requests:      make(chan *ingressRequest, bufferSize),
 	}
 }
 
@@ -98,7 +100,7 @@ func (i *Ingress) process(ctx context.Context, task *Task) error {
 		// TODO - document
 		result := make(chan error)
 		go func() {
-			leaseExpiration := time.Now().Add(time.Second * 40) // TODO - parameterize the lease duration
+			leaseExpiration := time.Now().Add(i.leaseDuration)
 			task.LeaseExpirationAt = &leaseExpiration
 
 			// add task to DB

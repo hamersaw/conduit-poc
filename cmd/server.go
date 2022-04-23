@@ -25,10 +25,16 @@ var (
 	dbPassword = flag.String("db-password", "foo", "The DB password")
 	dbPort = flag.Int("db-port", 5432, "The DB server port")
 	dbUsername = flag.String("db-username", "postgres", "The DB username")
+	// TODO - are these set by the worker?
+	heartbeatDuration = flag.Duration("heartbeat-duration", time.Second * 25, "The duration for which a heartbeat is valid")
+	//heartbeatInterval = flag.Duration("heartbeat-interval", time.Second * 10, "The interval at which heartbeat(s) are extended")
 	host = flag.String("host", "127.0.0.1", "The server host")
+	leaseDuration = flag.Duration("lease-duration", time.Second * 25, "The duration for which a lease is valid")
+	leaseUpdateInterval = flag.Duration("lease-update-interval", time.Second * 10, "The interval at which lease(s) are extended")
 	port = flag.Int("port", 50051, "The server port")
 	ingressBufferSize = flag.Int("ingress-buffer-size", 100, "The maximum number of items allowed in the ingress buffer")
 	queueBufferSize = flag.Int("queue-buffer-size", 20, "The maximum number of items allowed in each queue buffer")
+	queueRefreshInterval = flag.Duration("queue-refresh-interval", time.Second * 5, "The interval at queues refresh from the persistent store")
 )
 
 func main() {
@@ -49,7 +55,7 @@ func main() {
 
 	// initalize and start Ingress
 	var queues sync.Map
-	ingress := conduit.NewIngress(db, &queues, *ingressBufferSize)
+	ingress := conduit.NewIngress(db, *leaseDuration, &queues, *ingressBufferSize)
 	ingress.Start(ctx)
 
 	// intialize grpc server and register services
@@ -99,13 +105,13 @@ func (c *Conduit) CreateQueue(ctx context.Context, request *proto.CreateQueueReq
 	queue := request.GetQueue()
 
 	// initialize and store new queue
-	q := conduit.NewQueue(*queueBufferSize, queue.GetTopic())
+	q := conduit.NewQueue(*queueBufferSize, c.db, *leaseDuration, *leaseUpdateInterval, queue.GetTopic(), *queueRefreshInterval)
 	if _, loaded := c.queues.LoadOrStore(queue.GetTopic(), &q); loaded {
 		return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("queue for topic '%s' already exists", queue.GetTopic()))
 	}
 
 	// start queue
-	if err := q.Start(context.Background(), c.db); err != nil {
+	if err := q.Start(context.Background()); err != nil {
 		c.queues.Delete(queue.GetTopic())
 		return nil, status.Errorf(codes.Internal, fmt.Sprintf("failed to start queue '%v' with err: %v", queue.GetTopic(), err))
 	}
@@ -148,7 +154,7 @@ func (c *Conduit) Heartbeat(ctx context.Context, request *proto.HeartbeatRequest
 	}
 
 	if len(request.InProgressIds) > 0 {
-		if err := conduit.HeartbeatTasks(ctx, c.db, request.InProgressIds); err != nil {
+		if err := conduit.HeartbeatTasks(ctx, c.db, request.InProgressIds, *heartbeatDuration); err != nil {
 			return nil, status.Errorf(codes.Internal, fmt.Sprintf("failed to heartbeat tasks '%v' with err: %v", request.InProgressIds, err))
 		}
 	}

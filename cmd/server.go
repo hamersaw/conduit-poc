@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	conduit "github.com/hamersaw/conduit-poc"
 	proto "github.com/hamersaw/conduit-poc/protos/gen/pb-go"
+	"github.com/hamersaw/conduit-poc/server"
 
 	"github.com/uptrace/bun"
 
@@ -47,7 +47,7 @@ func main() {
 	}
 
 	// connect to database
-	db, err := conduit.OpenDB(ctx, *dbHost, *dbPort, *dbUsername, *dbPassword, *dbName)
+	db, err := server.OpenDB(ctx, *dbHost, *dbPort, *dbUsername, *dbPassword, *dbName)
 	if err != nil {
 		log.Fatalf("failed to connect to db: %v", err)
 	}
@@ -55,7 +55,7 @@ func main() {
 
 	// initalize and start Ingress
 	var queues sync.Map
-	ingress := conduit.NewIngress(db, *leaseDuration, &queues, *ingressBufferSize)
+	ingress := server.NewIngress(db, *leaseDuration, &queues, *ingressBufferSize)
 	ingress.Start(ctx)
 
 	// intialize grpc server and register services
@@ -80,13 +80,13 @@ func main() {
 
 type Conduit struct {
 	db      *bun.DB
-	ingress *conduit.Ingress
+	ingress *server.Ingress
 	queues  *sync.Map
 }
 
 func (c *Conduit) AddTask(ctx context.Context, request *proto.AddTaskRequest) (*proto.AddTaskResponse, error) {
 	now := time.Now()
-	task := conduit.FromProto(*request.GetTask())
+	task := server.FromProto(*request.GetTask())
 	task.InitializedAt = &now
 
 	if err := c.ingress.AddTask(ctx, task); err != nil {
@@ -105,7 +105,7 @@ func (c *Conduit) CreateQueue(ctx context.Context, request *proto.CreateQueueReq
 	queue := request.GetQueue()
 
 	// initialize and store new queue
-	q := conduit.NewQueue(*queueBufferSize, c.db, *leaseDuration, *leaseUpdateInterval, queue.GetTopic(), *queueRefreshInterval)
+	q := server.NewQueue(*queueBufferSize, c.db, *leaseDuration, *leaseUpdateInterval, queue.GetTopic(), *queueRefreshInterval)
 	if _, loaded := c.queues.LoadOrStore(queue.GetTopic(), &q); loaded {
 		return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("queue for topic '%s' already exists", queue.GetTopic()))
 	}
@@ -127,7 +127,7 @@ func (c *Conduit) GetTask(ctx context.Context, request *proto.GetTaskRequest) (*
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("queue for topic '%s' does not exist", topic))
 	}
-	q, _ := o.(*conduit.Queue)
+	q, _ := o.(*server.Queue)
 
 	// get task
 	task, err := q.GetTask(ctx)
@@ -148,13 +148,13 @@ func (c *Conduit) GetTask(ctx context.Context, request *proto.GetTaskRequest) (*
 func (c *Conduit) Heartbeat(ctx context.Context, request *proto.HeartbeatRequest) (*proto.HeartbeatResponse, error) {
 	log.Printf("HEARTBEAT: %v", request)
 	if len(request.CompletedIds) > 0 {
-		if err := conduit.CompleteTasks(ctx, c.db, request.CompletedIds); err != nil {
+		if err := server.CompleteTasks(ctx, c.db, request.CompletedIds); err != nil {
 			return nil, status.Errorf(codes.Internal, fmt.Sprintf("failed to complete tasks '%v' with err: %v", request.CompletedIds, err))
 		}
 	}
 
 	if len(request.InProgressIds) > 0 {
-		if err := conduit.HeartbeatTasks(ctx, c.db, request.InProgressIds, *heartbeatDuration); err != nil {
+		if err := server.HeartbeatTasks(ctx, c.db, request.InProgressIds, *heartbeatDuration); err != nil {
 			return nil, status.Errorf(codes.Internal, fmt.Sprintf("failed to heartbeat tasks '%v' with err: %v", request.InProgressIds, err))
 		}
 	}

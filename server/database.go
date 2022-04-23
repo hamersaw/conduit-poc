@@ -1,4 +1,4 @@
-package conduit
+package server
 
 import (
 	"context"

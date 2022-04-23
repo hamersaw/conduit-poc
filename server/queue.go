@@ -1,10 +1,12 @@
-package conduit
+package server
 
 import (
 	"context"
 	"fmt"
 	"log"
 	"time"
+
+	conduit "github.com/hamersaw/conduit-poc"
 
 	"github.com/uptrace/bun"
 )
@@ -19,7 +21,7 @@ type Queue struct {
 	bufferSize           int
 	db                   *bun.DB
 	head                 chan *TaskOffer
-	leasedTaskIds        *Set
+	leasedTaskIds        *conduit.Set
 	leaseDuration        time.Duration
 	leaseUpdateInterval  time.Duration
 	topic                string
@@ -32,7 +34,7 @@ func NewQueue(bufferSize int, db *bun.DB, leaseDuration, leaseUpdateInterval tim
 		buffer:               make(chan *Task, bufferSize-1),
 		bufferSize:           bufferSize,
 		head:                 make(chan *TaskOffer),
-		leasedTaskIds:        new(Set),
+		leasedTaskIds:        new(conduit.Set),
 		leaseDuration:        leaseDuration,
 		leaseUpdateInterval:  leaseUpdateInterval,
 		topic:                topic,
